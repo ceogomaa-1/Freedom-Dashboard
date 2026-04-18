@@ -126,3 +126,12 @@ create policy "own plan snapshots"
   on plan_snapshots for all
   using  (auth.uid() = user_id)
   with check (auth.uid() = user_id);
+
+-- ── Plan Cache (system-level, shared across all users) ────
+
+create table if not exists plan_cache (
+  id         uuid        primary key default gen_random_uuid(),
+  cache_key  text        not null unique default 'global',
+  plans      jsonb       not null default '[]'::jsonb,
+  fetched_at timestamptz not null default now()
+);

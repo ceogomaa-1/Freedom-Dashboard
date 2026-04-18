@@ -70,3 +70,25 @@ create policy "own day ratings"
   on day_ratings for all
   using  (auth.uid() = user_id)
   with check (auth.uid() = user_id);
+
+-- ── App Authenticator Sign-in ─────────────────────────────
+
+create table if not exists app_auth_users (
+  email         text primary key,
+  user_id       uuid references auth.users(id) on delete set null unique,
+  totp_secret   text not null,
+  enrolled_at   timestamptz,
+  last_login_at timestamptz,
+  created_at    timestamptz default now() not null
+);
+
+create table if not exists app_sessions (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid references auth.users(id) on delete cascade not null,
+  token_hash  text not null unique,
+  expires_at  timestamptz not null,
+  created_at  timestamptz default now() not null
+);
+
+create index if not exists app_sessions_user_id_idx on app_sessions(user_id);
+create index if not exists app_sessions_expires_at_idx on app_sessions(expires_at);

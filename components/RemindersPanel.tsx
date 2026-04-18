@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
-import { createClient } from '@/utils/supabase/client'
 
 interface Reminder {
   id: string
@@ -11,7 +10,7 @@ interface Reminder {
   created_at: string
 }
 
-export default function RemindersPanel({ userId }: { userId: string }) {
+export default function RemindersPanel() {
   const [reminders, setReminders] = useState<Reminder[]>([])
   const [newText, setNewText] = useState('')
   const [newDate, setNewDate] = useState('')
@@ -20,8 +19,6 @@ export default function RemindersPanel({ userId }: { userId: string }) {
   const [editDate, setEditDate] = useState('')
   const [loading, setLoading] = useState(true)
   const editRef = useRef<HTMLInputElement>(null)
-  const supabase = createClient()
-
   useEffect(() => {
     fetchReminders()
     setNewDate(todayISO())
@@ -36,38 +33,39 @@ export default function RemindersPanel({ userId }: { userId: string }) {
   }
 
   async function fetchReminders() {
-    const { data } = await supabase
-      .from('reminders')
-      .select('*')
-      .eq('user_id', userId)
-      .order('date', { ascending: true })
-    if (data) setReminders(data)
+    const response = await fetch('/api/reminders', { cache: 'no-store' })
+    const payload = await response.json()
+
+    if (response.ok) setReminders(payload.reminders)
     setLoading(false)
   }
 
   async function addReminder(e: React.FormEvent) {
     e.preventDefault()
     if (!newText.trim() || !newDate) return
-    const { data } = await supabase
-      .from('reminders')
-      .insert({ user_id: userId, text: newText.trim(), date: newDate, completed: false })
-      .select()
-      .single()
-    if (data) {
-      setReminders(prev => [...prev, data].sort((a, b) => a.date.localeCompare(b.date)))
+    const response = await fetch('/api/reminders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: newText.trim(), date: newDate }),
+    })
+    const payload = await response.json()
+
+    if (response.ok) {
+      setReminders(prev => [...prev, payload.reminder].sort((a, b) => a.date.localeCompare(b.date)))
       setNewText('')
       setNewDate(todayISO())
     }
   }
 
   async function toggleReminder(id: string, completed: boolean) {
-    const { data } = await supabase
-      .from('reminders')
-      .update({ completed: !completed })
-      .eq('id', id)
-      .select()
-      .single()
-    if (data) setReminders(prev => prev.map(r => r.id === id ? data : r))
+    const response = await fetch(`/api/reminders/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ completed: !completed }),
+    })
+    const payload = await response.json()
+
+    if (response.ok) setReminders(prev => prev.map(r => r.id === id ? payload.reminder : r))
   }
 
   function startEdit(r: Reminder) {
@@ -78,23 +76,24 @@ export default function RemindersPanel({ userId }: { userId: string }) {
 
   async function saveEdit(id: string) {
     if (!editText.trim() || !editDate) { setEditingId(null); return }
-    const { data } = await supabase
-      .from('reminders')
-      .update({ text: editText.trim(), date: editDate })
-      .eq('id', id)
-      .select()
-      .single()
-    if (data) {
+    const response = await fetch(`/api/reminders/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: editText.trim(), date: editDate }),
+    })
+    const payload = await response.json()
+
+    if (response.ok) {
       setReminders(prev =>
-        prev.map(r => r.id === id ? data : r).sort((a, b) => a.date.localeCompare(b.date))
+        prev.map(r => r.id === id ? payload.reminder : r).sort((a, b) => a.date.localeCompare(b.date))
       )
     }
     setEditingId(null)
   }
 
   async function deleteReminder(id: string) {
-    await supabase.from('reminders').delete().eq('id', id)
-    setReminders(prev => prev.filter(r => r.id !== id))
+    const response = await fetch(`/api/reminders/${id}`, { method: 'DELETE' })
+    if (response.ok) setReminders(prev => prev.filter(r => r.id !== id))
   }
 
   function formatDate(dateStr: string) {

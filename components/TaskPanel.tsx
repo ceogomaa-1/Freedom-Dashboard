@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
-import { createClient } from '@/utils/supabase/client'
 
 interface Task {
   id: string
@@ -10,15 +9,13 @@ interface Task {
   created_at: string
 }
 
-export default function TaskPanel({ userId }: { userId: string }) {
+export default function TaskPanel() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [newTask, setNewTask] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editText, setEditText] = useState('')
   const [loading, setLoading] = useState(true)
   const editRef = useRef<HTMLInputElement>(null)
-  const supabase = createClient()
-
   useEffect(() => {
     fetchTasks()
   }, [])
@@ -28,37 +25,38 @@ export default function TaskPanel({ userId }: { userId: string }) {
   }, [editingId])
 
   async function fetchTasks() {
-    const { data } = await supabase
-      .from('tasks')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: true })
-    if (data) setTasks(data)
+    const response = await fetch('/api/tasks', { cache: 'no-store' })
+    const payload = await response.json()
+
+    if (response.ok) setTasks(payload.tasks)
     setLoading(false)
   }
 
   async function addTask(e: React.FormEvent) {
     e.preventDefault()
     if (!newTask.trim()) return
-    const { data } = await supabase
-      .from('tasks')
-      .insert({ user_id: userId, text: newTask.trim(), completed: false })
-      .select()
-      .single()
-    if (data) {
-      setTasks(prev => [...prev, data])
+    const response = await fetch('/api/tasks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: newTask.trim() }),
+    })
+    const payload = await response.json()
+
+    if (response.ok) {
+      setTasks(prev => [...prev, payload.task])
       setNewTask('')
     }
   }
 
   async function toggleTask(id: string, completed: boolean) {
-    const { data } = await supabase
-      .from('tasks')
-      .update({ completed: !completed })
-      .eq('id', id)
-      .select()
-      .single()
-    if (data) setTasks(prev => prev.map(t => t.id === id ? data : t))
+    const response = await fetch(`/api/tasks/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ completed: !completed }),
+    })
+    const payload = await response.json()
+
+    if (response.ok) setTasks(prev => prev.map(t => t.id === id ? payload.task : t))
   }
 
   function startEdit(task: Task) {
@@ -68,19 +66,20 @@ export default function TaskPanel({ userId }: { userId: string }) {
 
   async function saveEdit(id: string) {
     if (!editText.trim()) { setEditingId(null); return }
-    const { data } = await supabase
-      .from('tasks')
-      .update({ text: editText.trim() })
-      .eq('id', id)
-      .select()
-      .single()
-    if (data) setTasks(prev => prev.map(t => t.id === id ? data : t))
+    const response = await fetch(`/api/tasks/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: editText.trim() }),
+    })
+    const payload = await response.json()
+
+    if (response.ok) setTasks(prev => prev.map(t => t.id === id ? payload.task : t))
     setEditingId(null)
   }
 
   async function deleteTask(id: string) {
-    await supabase.from('tasks').delete().eq('id', id)
-    setTasks(prev => prev.filter(t => t.id !== id))
+    const response = await fetch(`/api/tasks/${id}`, { method: 'DELETE' })
+    if (response.ok) setTasks(prev => prev.filter(t => t.id !== id))
   }
 
   const completedCount = tasks.filter(t => t.completed).length

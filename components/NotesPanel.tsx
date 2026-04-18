@@ -1,17 +1,14 @@
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
-import { createClient } from '@/utils/supabase/client'
 
-export default function NotesPanel({ userId }: { userId: string }) {
+export default function NotesPanel() {
   const [notes, setNotes] = useState('')
   const [rating, setRating] = useState<number | null>(null)
   const [saving, setSaving] = useState(false)
   const [lastSaved, setLastSaved] = useState<Date | null>(null)
   const [loading, setLoading] = useState(true)
   const debounceTimer = useRef<ReturnType<typeof setTimeout>>()
-  const supabase = createClient()
-
   const todayISO = new Date().toISOString().split('T')[0]
   const todayLabel = new Date().toLocaleDateString('en-CA', {
     weekday: 'long',
@@ -24,12 +21,13 @@ export default function NotesPanel({ userId }: { userId: string }) {
   }, [])
 
   async function fetchData() {
-    const [notesRes, ratingRes] = await Promise.all([
-      supabase.from('notes').select('content').eq('user_id', userId).maybeSingle(),
-      supabase.from('day_ratings').select('rating').eq('user_id', userId).eq('date', todayISO).maybeSingle(),
-    ])
-    if (notesRes.data) setNotes(notesRes.data.content || '')
-    if (ratingRes.data) setRating(ratingRes.data.rating)
+    const response = await fetch('/api/notes', { cache: 'no-store' })
+    const payload = await response.json()
+
+    if (response.ok) {
+      setNotes(payload.notes ?? '')
+      setRating(payload.rating ?? null)
+    }
     setLoading(false)
   }
 
@@ -38,10 +36,11 @@ export default function NotesPanel({ userId }: { userId: string }) {
     if (debounceTimer.current) clearTimeout(debounceTimer.current)
     debounceTimer.current = setTimeout(async () => {
       setSaving(true)
-      await supabase.from('notes').upsert(
-        { user_id: userId, content: value, updated_at: new Date().toISOString() },
-        { onConflict: 'user_id' }
-      )
+      await fetch('/api/notes', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: value }),
+      })
       setSaving(false)
       setLastSaved(new Date())
     }, 900)
@@ -50,14 +49,11 @@ export default function NotesPanel({ userId }: { userId: string }) {
   async function handleRating(value: number) {
     const next = rating === value ? null : value
     setRating(next)
-    if (next === null) {
-      await supabase.from('day_ratings').delete().eq('user_id', userId).eq('date', todayISO)
-    } else {
-      await supabase.from('day_ratings').upsert(
-        { user_id: userId, rating: next, date: todayISO },
-        { onConflict: 'user_id,date' }
-      )
-    }
+    await fetch('/api/day-rating', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rating: next }),
+    })
   }
 
   function ratingBtnClass(value: number) {

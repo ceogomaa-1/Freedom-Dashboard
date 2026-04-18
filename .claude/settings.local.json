@@ -3,7 +3,10 @@
     "allow": [
       "WebFetch(domain:www.freedommobile.ca)",
       "Bash(npm install *)",
-      "Bash(npx tsc *)"
+      "Bash(npx tsc *)",
+      "Bash(npm ls *)",
+      "Bash(xargs cat *)",
+      "Bash(npx next *)"
     ]
   }
 }

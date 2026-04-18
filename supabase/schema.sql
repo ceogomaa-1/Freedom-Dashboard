@@ -92,3 +92,37 @@ create table if not exists app_sessions (
 
 create index if not exists app_sessions_user_id_idx on app_sessions(user_id);
 create index if not exists app_sessions_expires_at_idx on app_sessions(expires_at);
+
+-- ── Aria Conversations ────────────────────────────────────
+
+create table if not exists aria_conversations (
+  id                  uuid        primary key default gen_random_uuid(),
+  user_id             uuid        references auth.users(id) on delete cascade not null unique,
+  messages            jsonb       not null default '[]'::jsonb,
+  onboarding_complete boolean     not null default false,
+  user_profile        jsonb       not null default '{}'::jsonb,
+  updated_at          timestamptz not null default now()
+);
+
+alter table aria_conversations enable row level security;
+
+create policy "own aria conversations"
+  on aria_conversations for all
+  using  (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+-- ── Plan Snapshots ────────────────────────────────────────
+
+create table if not exists plan_snapshots (
+  id         uuid        primary key default gen_random_uuid(),
+  user_id    uuid        references auth.users(id) on delete cascade not null unique,
+  plans      jsonb       not null default '[]'::jsonb,
+  updated_at timestamptz not null default now()
+);
+
+alter table plan_snapshots enable row level security;
+
+create policy "own plan snapshots"
+  on plan_snapshots for all
+  using  (auth.uid() = user_id)
+  with check (auth.uid() = user_id);

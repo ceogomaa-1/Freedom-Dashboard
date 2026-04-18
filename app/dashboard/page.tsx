@@ -2,6 +2,8 @@ import { redirect } from 'next/navigation'
 import TaskPanel from '@/components/TaskPanel'
 import RemindersPanel from '@/components/RemindersPanel'
 import NotesPanel from '@/components/NotesPanel'
+import NewsSummaryPanel from '@/components/NewsSummaryPanel'
+import PlansPanel from '@/components/PlansPanel'
 import { getSessionUser } from '@/utils/auth/session'
 import DashboardShell from '@/components/DashboardShell'
 
@@ -49,6 +51,11 @@ export default async function DashboardPage() {
       <TaskPanel />
       <RemindersPanel />
       <NotesPanel />
+      {/* Row 2 */}
+      <div className="lg:col-span-2">
+        <NewsSummaryPanel />
+      </div>
+      <PlansPanel />
     </DashboardShell>
   )
 }

@@ -2,6 +2,7 @@
 
 import { ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
+import AriaChat from '@/components/AriaChat'
 
 function FreedomMark({ size = 26 }: { size?: number }) {
   return (
@@ -83,6 +84,9 @@ export default function DashboardShell({
           {children}
         </div>
       </main>
+
+      {/* ── Aria floating chat ── */}
+      <AriaChat displayName={displayName} />
     </div>
   )
 }

@@ -16,195 +16,160 @@ export default function TaskPanel() {
   const [editText, setEditText] = useState('')
   const [loading, setLoading] = useState(true)
   const editRef = useRef<HTMLInputElement>(null)
-  useEffect(() => {
-    fetchTasks()
-  }, [])
 
-  useEffect(() => {
-    if (editingId) editRef.current?.focus()
-  }, [editingId])
+  useEffect(() => { fetchTasks() }, [])
+  useEffect(() => { if (editingId) editRef.current?.focus() }, [editingId])
 
   async function fetchTasks() {
-    const response = await fetch('/api/tasks', { cache: 'no-store' })
-    const payload = await response.json()
-
-    if (response.ok) setTasks(payload.tasks)
+    const r = await fetch('/api/tasks', { cache: 'no-store' })
+    const p = await r.json()
+    if (r.ok) setTasks(p.tasks)
     setLoading(false)
   }
 
   async function addTask(e: React.FormEvent) {
     e.preventDefault()
     if (!newTask.trim()) return
-    const response = await fetch('/api/tasks', {
+    const r = await fetch('/api/tasks', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text: newTask.trim() }),
     })
-    const payload = await response.json()
-
-    if (response.ok) {
-      setTasks(prev => [...prev, payload.task])
-      setNewTask('')
-    }
+    const p = await r.json()
+    if (r.ok) { setTasks(prev => [...prev, p.task]); setNewTask('') }
   }
 
   async function toggleTask(id: string, completed: boolean) {
-    const response = await fetch(`/api/tasks/${id}`, {
+    const r = await fetch(`/api/tasks/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ completed: !completed }),
     })
-    const payload = await response.json()
-
-    if (response.ok) setTasks(prev => prev.map(t => t.id === id ? payload.task : t))
-  }
-
-  function startEdit(task: Task) {
-    setEditingId(task.id)
-    setEditText(task.text)
+    const p = await r.json()
+    if (r.ok) setTasks(prev => prev.map(t => t.id === id ? p.task : t))
   }
 
   async function saveEdit(id: string) {
     if (!editText.trim()) { setEditingId(null); return }
-    const response = await fetch(`/api/tasks/${id}`, {
+    const r = await fetch(`/api/tasks/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text: editText.trim() }),
     })
-    const payload = await response.json()
-
-    if (response.ok) setTasks(prev => prev.map(t => t.id === id ? payload.task : t))
+    const p = await r.json()
+    if (r.ok) setTasks(prev => prev.map(t => t.id === id ? p.task : t))
     setEditingId(null)
   }
 
   async function deleteTask(id: string) {
-    const response = await fetch(`/api/tasks/${id}`, { method: 'DELETE' })
-    if (response.ok) setTasks(prev => prev.filter(t => t.id !== id))
+    const r = await fetch(`/api/tasks/${id}`, { method: 'DELETE' })
+    if (r.ok) setTasks(prev => prev.filter(t => t.id !== id))
   }
 
-  const completedCount = tasks.filter(t => t.completed).length
-  const progress = tasks.length > 0 ? (completedCount / tasks.length) * 100 : 0
+  const done = tasks.filter(t => t.completed).length
+  const pct = tasks.length > 0 ? (done / tasks.length) * 100 : 0
 
   return (
-    <div className="bg-white rounded-2xl shadow-card border border-freedom-border flex flex-col" style={{ minHeight: 520 }}>
-      {/* Panel header */}
-      <div className="p-5 border-b border-freedom-border">
-        <div className="flex items-center gap-3 mb-1">
-          <div className="w-1 h-6 bg-freedom-green rounded-full" />
-          <h2 className="text-base font-bold text-freedom-black tracking-tight">Daily Operations</h2>
+    <div className="bg-n-surface border border-n-border rounded-xl flex flex-col" style={{ minHeight: 520 }}>
+      {/* Header */}
+      <div className="px-4 pt-4 pb-3 border-b border-n-divider">
+        <div className="flex items-center gap-2 mb-2">
+          <div className="w-0.5 h-4 bg-n-green rounded-full flex-shrink-0" />
+          <h2 className="text-sm font-semibold text-n-text">Daily Operations</h2>
+          <span className="ml-auto text-xs text-n-muted">{done}/{tasks.length}</span>
         </div>
-        <p className="text-xs text-freedom-text-light ml-4">
-          {completedCount} of {tasks.length} completed
-        </p>
         {tasks.length > 0 && (
-          <div className="ml-4 mt-2.5 h-1.5 bg-freedom-gray rounded-full overflow-hidden">
+          <div className="h-0.5 bg-n-raised rounded-full overflow-hidden">
             <div
-              className="h-full bg-freedom-green rounded-full transition-all duration-500"
-              style={{ width: `${progress}%` }}
+              className="h-full bg-n-green rounded-full transition-all duration-500"
+              style={{ width: `${pct}%` }}
             />
           </div>
         )}
       </div>
 
-      {/* Task list */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-2" style={{ maxHeight: 380 }}>
-        {loading ? (
-          <Spinner />
-        ) : tasks.length === 0 ? (
-          <EmptyState icon="tasks" text="No tasks yet. Add your first one below!" />
-        ) : (
-          tasks.map(task => (
-            <div
-              key={task.id}
-              className={`group flex items-center gap-3 p-3 rounded-xl border transition-all ${
+      {/* List */}
+      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-1" style={{ maxHeight: 400 }}>
+        {loading ? <Spinner /> : tasks.length === 0 ? (
+          <Empty text="No tasks yet — add one below." />
+        ) : tasks.map(task => (
+          <div
+            key={task.id}
+            className={`group flex items-center gap-2.5 px-2.5 py-2 rounded-lg transition-colors ${
+              task.completed ? 'opacity-50' : 'hover:bg-n-raised'
+            }`}
+          >
+            {/* Checkbox */}
+            <button
+              onClick={() => toggleTask(task.id, task.completed)}
+              className={`flex-shrink-0 w-4 h-4 rounded border flex items-center justify-center transition-all ${
                 task.completed
-                  ? 'bg-freedom-gray border-freedom-border'
-                  : 'bg-white border-freedom-border hover:border-freedom-green/40 hover:shadow-sm'
+                  ? 'bg-n-green border-n-green'
+                  : 'border-n-border hover:border-n-green'
               }`}
             >
-              {/* Checkbox */}
-              <button
-                onClick={() => toggleTask(task.id, task.completed)}
-                className={`flex-shrink-0 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
-                  task.completed
-                    ? 'bg-freedom-green border-freedom-green'
-                    : 'border-freedom-border hover:border-freedom-green'
+              {task.completed && (
+                <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                </svg>
+              )}
+            </button>
+
+            {/* Text */}
+            {editingId === task.id ? (
+              <input
+                ref={editRef}
+                value={editText}
+                onChange={e => setEditText(e.target.value)}
+                onBlur={() => saveEdit(task.id)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') saveEdit(task.id)
+                  if (e.key === 'Escape') setEditingId(null)
+                }}
+                className="flex-1 text-sm bg-transparent border-b border-n-green outline-none text-n-text py-0"
+              />
+            ) : (
+              <span
+                onClick={() => !task.completed && (setEditingId(task.id), setEditText(task.text))}
+                className={`flex-1 text-sm leading-snug select-none ${
+                  task.completed ? 'line-through text-n-muted' : 'text-n-text cursor-text'
                 }`}
               >
-                {task.completed && (
-                  <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                  </svg>
+                {task.text}
+              </span>
+            )}
+
+            {/* Actions */}
+            {editingId !== task.id && (
+              <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                {!task.completed && (
+                  <IconBtn onClick={() => { setEditingId(task.id); setEditText(task.text) }} label="Edit">
+                    <EditIcon />
+                  </IconBtn>
                 )}
-              </button>
-
-              {/* Text / inline edit */}
-              {editingId === task.id ? (
-                <input
-                  ref={editRef}
-                  value={editText}
-                  onChange={e => setEditText(e.target.value)}
-                  onBlur={() => saveEdit(task.id)}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') saveEdit(task.id)
-                    if (e.key === 'Escape') setEditingId(null)
-                  }}
-                  className="flex-1 text-sm bg-transparent border-b-2 border-freedom-green outline-none py-0.5 text-freedom-text"
-                />
-              ) : (
-                <span
-                  onClick={() => !task.completed && startEdit(task)}
-                  className={`flex-1 text-sm leading-snug select-none ${
-                    task.completed
-                      ? 'line-through text-freedom-text-light'
-                      : 'text-freedom-text cursor-pointer hover:text-freedom-black'
-                  }`}
-                >
-                  {task.text}
-                </span>
-              )}
-
-              {/* Actions */}
-              {editingId !== task.id && (
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  {!task.completed && (
-                    <button
-                      onClick={() => startEdit(task)}
-                      className="p-1 text-freedom-text-light hover:text-freedom-green transition-colors"
-                      title="Edit"
-                    >
-                      <EditIcon />
-                    </button>
-                  )}
-                  <button
-                    onClick={() => deleteTask(task.id)}
-                    className="p-1 text-freedom-text-light hover:text-red-500 transition-colors"
-                    title="Delete"
-                  >
-                    <TrashIcon />
-                  </button>
-                </div>
-              )}
-            </div>
-          ))
-        )}
+                <IconBtn onClick={() => deleteTask(task.id)} label="Delete" danger>
+                  <TrashIcon />
+                </IconBtn>
+              </div>
+            )}
+          </div>
+        ))}
       </div>
 
-      {/* Add task */}
-      <div className="border-t border-freedom-border p-4">
+      {/* Add input */}
+      <div className="px-3 pb-3 pt-2 border-t border-n-divider">
         <form onSubmit={addTask} className="flex gap-2">
           <input
             type="text"
             value={newTask}
             onChange={e => setNewTask(e.target.value)}
-            placeholder="Add a new task…"
-            className="flex-1 px-3 py-2.5 text-sm border-2 border-freedom-border rounded-xl focus:outline-none focus:border-freedom-green text-freedom-text placeholder-freedom-text-light transition-colors"
+            placeholder="Add a task…"
+            className="flex-1 px-3 py-2 bg-n-bg border border-n-border rounded-lg text-sm text-n-text placeholder-n-muted focus:outline-none focus:border-n-green transition-colors"
           />
           <button
             type="submit"
             disabled={!newTask.trim()}
-            className="px-4 py-2.5 bg-freedom-green hover:bg-freedom-green-dark text-white rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
-            title="Add task"
+            className="px-3 py-2 bg-n-green hover:bg-n-green-d text-white rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed flex-shrink-0"
           >
             <PlusIcon />
           </button>
@@ -214,36 +179,47 @@ export default function TaskPanel() {
   )
 }
 
+function IconBtn({
+  onClick,
+  label,
+  danger,
+  children,
+}: {
+  onClick: () => void
+  label: string
+  danger?: boolean
+  children: React.ReactNode
+}) {
+  return (
+    <button
+      onClick={onClick}
+      title={label}
+      className={`p-1 rounded transition-colors ${
+        danger
+          ? 'text-n-muted hover:text-n-red'
+          : 'text-n-muted hover:text-n-green'
+      }`}
+    >
+      {children}
+    </button>
+  )
+}
+
 function Spinner() {
   return (
     <div className="flex items-center justify-center py-10">
-      <div className="w-6 h-6 border-2 border-freedom-green border-t-transparent rounded-full animate-spin" />
+      <div className="w-5 h-5 border-2 border-n-green border-t-transparent rounded-full animate-spin" />
     </div>
   )
 }
 
-function EmptyState({ icon, text }: { icon: 'tasks' | 'calendar'; text: string }) {
-  return (
-    <div className="text-center py-10">
-      <div className="w-12 h-12 bg-freedom-green-light rounded-2xl flex items-center justify-center mx-auto mb-3">
-        {icon === 'tasks' ? (
-          <svg className="w-6 h-6 text-freedom-green" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-          </svg>
-        ) : (
-          <svg className="w-6 h-6 text-freedom-green" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-          </svg>
-        )}
-      </div>
-      <p className="text-freedom-text-light text-sm">{text}</p>
-    </div>
-  )
+function Empty({ text }: { text: string }) {
+  return <p className="text-xs text-n-muted text-center py-8">{text}</p>
 }
 
 function EditIcon() {
   return (
-    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
     </svg>
   )
@@ -251,7 +227,7 @@ function EditIcon() {
 
 function TrashIcon() {
   return (
-    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
     </svg>
   )

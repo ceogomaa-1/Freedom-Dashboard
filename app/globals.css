@@ -4,42 +4,47 @@
 @tailwind components;
 @tailwind utilities;
 
-* {
+*, *::before, *::after {
   box-sizing: border-box;
 }
 
 html {
   font-family: 'Inter', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
 
 body {
-  background-color: #F5F7FA;
-  color: #2D2D2D;
+  background-color: #191919;
+  color: #E6E6E6;
 }
 
+/* Notion-style minimal scrollbar */
 ::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 4px;
+  height: 4px;
 }
-
 ::-webkit-scrollbar-track {
-  background: #F0F0F0;
+  background: transparent;
 }
-
 ::-webkit-scrollbar-thumb {
-  background: #00C389;
+  background: #383838;
   border-radius: 4px;
 }
-
 ::-webkit-scrollbar-thumb:hover {
-  background: #00A876;
+  background: #00C389;
 }
 
 input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.6);
   cursor: pointer;
-  opacity: 0.6;
+}
+input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  filter: invert(0.8);
 }
 
-input[type="date"]::-webkit-calendar-picker-indicator:hover {
-  opacity: 1;
+/* Remove number input spinners */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }

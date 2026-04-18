@@ -1,8 +1,100 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
-import { Suspense } from 'react'
+
+function FreedomMark({ size = 24 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 40 40" fill="none">
+      <rect width="40" height="40" rx="8" fill="#00C389" />
+      <path d="M10 12h16v4H14v4h10v4H14v8h-4V12z" fill="white" />
+      <rect x="22" y="20" width="8" height="4" rx="1" fill="white" />
+    </svg>
+  )
+}
+
+function InputField({
+  label,
+  type = 'text',
+  value,
+  onChange,
+  placeholder,
+  required,
+  autoFocus,
+  inputMode,
+  className = '',
+}: {
+  label: string
+  type?: string
+  value: string
+  onChange: (v: string) => void
+  placeholder?: string
+  required?: boolean
+  autoFocus?: boolean
+  inputMode?: React.InputHTMLAttributes<HTMLInputElement>['inputMode']
+  className?: string
+}) {
+  return (
+    <div>
+      <label className="block text-xs font-medium text-n-sub mb-1.5 uppercase tracking-wider">
+        {label}
+      </label>
+      <input
+        type={type}
+        inputMode={inputMode}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+        required={required}
+        autoFocus={autoFocus}
+        className={`w-full px-3.5 py-2.5 bg-n-bg border border-n-border rounded-lg text-sm text-n-text placeholder-n-muted focus:outline-none focus:border-n-green transition-colors ${className}`}
+      />
+    </div>
+  )
+}
+
+function ErrorBanner({ error }: { error: string }) {
+  return (
+    <div className="flex items-start gap-2.5 bg-n-red-x border border-n-red/30 text-n-red px-3.5 py-2.5 rounded-lg text-sm">
+      <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+      {error}
+    </div>
+  )
+}
+
+function GhostButton({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="w-full text-xs text-n-sub hover:text-n-text transition-colors py-1"
+    >
+      {children}
+    </button>
+  )
+}
+
+function PrimaryButton({ disabled, loading, children }: { disabled?: boolean; loading?: boolean; children: React.ReactNode }) {
+  return (
+    <button
+      type="submit"
+      disabled={disabled || loading}
+      className="w-full bg-n-green hover:bg-n-green-d text-white font-semibold py-2.5 px-4 rounded-lg text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+    >
+      {loading ? (
+        <span className="flex items-center justify-center gap-2">
+          <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+          {children}
+        </span>
+      ) : children}
+    </button>
+  )
+}
 
 function LoginForm() {
   const [email, setEmail] = useState('')
@@ -18,383 +110,243 @@ function LoginForm() {
   const router = useRouter()
 
   useEffect(() => {
-    const savedEmail = window.localStorage.getItem('fd_auth_email')
-    if (savedEmail) {
-      setEmail(savedEmail)
-      setRememberedEmail(savedEmail)
-    }
+    const saved = window.localStorage.getItem('fd_auth_email')
+    if (saved) { setEmail(saved); setRememberedEmail(saved) }
   }, [])
 
   useEffect(() => {
-    async function checkSession() {
-      const response = await fetch('/api/auth/session', { cache: 'no-store' })
-      const payload = await response.json()
-
-      if (payload.user) {
-        router.replace('/dashboard')
-        return
-      }
-
-      setCheckingSession(false)
-    }
-
-    checkSession()
+    fetch('/api/auth/session', { cache: 'no-store' })
+      .then(r => r.json())
+      .then(p => {
+        if (p.user) router.replace('/dashboard')
+        else setCheckingSession(false)
+      })
   }, [router])
 
   async function handleSetupStart(e: React.FormEvent) {
     e.preventDefault()
     if (!email.trim()) return
-
-    setLoading(true)
-    setError(null)
-
-    const response = await fetch('/api/auth/setup/start', {
+    setLoading(true); setError(null)
+    const res = await fetch('/api/auth/setup/start', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email }),
     })
-    const payload = await response.json()
+    const p = await res.json()
     setLoading(false)
-
-    if (!response.ok) {
-      setError(payload.error ?? 'Unable to start Authenticator setup.')
-      if (response.status === 409) {
-        setMode('login')
-      }
+    if (!res.ok) {
+      setError(p.error ?? 'Unable to start setup.')
+      if (res.status === 409) setMode('login')
       return
     }
-
     setSetupStarted(true)
-    setQrCodeDataUrl(payload.qrCodeDataUrl)
-    setManualEntryKey(payload.manualEntryKey)
+    setQrCodeDataUrl(p.qrCodeDataUrl)
+    setManualEntryKey(p.manualEntryKey)
     setCode('')
   }
 
   async function handleSetupVerify(e: React.FormEvent) {
     e.preventDefault()
     if (!email.trim() || !code.trim()) return
-
-    setLoading(true)
-    setError(null)
-
-    const response = await fetch('/api/auth/setup/verify', {
+    setLoading(true); setError(null)
+    const res = await fetch('/api/auth/setup/verify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, code }),
     })
-    const payload = await response.json()
+    const p = await res.json()
     setLoading(false)
-
-    if (!response.ok) {
-      setError(payload.error ?? 'Unable to verify that 6-digit code.')
-      return
-    }
-
+    if (!res.ok) { setError(p.error ?? 'Invalid code.'); return }
     window.localStorage.setItem('fd_auth_email', email.trim().toLowerCase())
-    router.replace('/dashboard')
-    router.refresh()
+    router.replace('/dashboard'); router.refresh()
   }
 
-  const handleLogin = async (e: React.FormEvent) => {
+  async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
     if (!email.trim() || !code.trim()) return
-
-    setLoading(true)
-    setError(null)
-
-    const response = await fetch('/api/auth/login', {
+    setLoading(true); setError(null)
+    const res = await fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, code }),
     })
-    const payload = await response.json()
+    const p = await res.json()
     setLoading(false)
-
-    if (!response.ok) {
-      setError(payload.error ?? 'Authentication failed.')
-      return
-    }
-
+    if (!res.ok) { setError(p.error ?? 'Authentication failed.'); return }
     window.localStorage.setItem('fd_auth_email', email.trim().toLowerCase())
-    router.replace('/dashboard')
-    router.refresh()
+    router.replace('/dashboard'); router.refresh()
   }
 
-  function resetRememberedUser() {
+  function resetUser() {
     window.localStorage.removeItem('fd_auth_email')
-    setRememberedEmail(null)
-    setEmail('')
-    setCode('')
-    setMode('setup')
-    setSetupStarted(false)
-    setQrCodeDataUrl(null)
-    setManualEntryKey(null)
-    setError(null)
+    setRememberedEmail(null); setEmail(''); setCode('')
+    setMode('setup'); setSetupStarted(false)
+    setQrCodeDataUrl(null); setManualEntryKey(null); setError(null)
   }
 
   if (checkingSession) {
     return (
-      <div className="min-h-screen bg-freedom-gray flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-[3px] border-freedom-green border-t-transparent rounded-full animate-spin" />
-          <p className="text-freedom-text-light text-sm font-medium">Loading secure sign-in…</p>
-        </div>
+      <div className="min-h-screen bg-n-bg flex items-center justify-center">
+        <div className="w-5 h-5 border-2 border-n-green border-t-transparent rounded-full animate-spin" />
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-freedom-gray flex flex-col">
-      {/* Top bar */}
-      <header className="bg-freedom-black h-14 flex items-center px-8 shadow-lg">
-        <div className="flex items-center gap-2.5">
-          <FreedomLogo />
-          <span className="text-white font-bold text-lg tracking-tight leading-none">
-            Freedom<span className="text-freedom-green">Mobile</span>
+    <div className="min-h-screen bg-n-bg flex flex-col">
+      {/* Minimal top bar */}
+      <header className="h-12 border-b border-n-border flex items-center px-6">
+        <div className="flex items-center gap-2">
+          <FreedomMark size={22} />
+          <span className="text-sm font-semibold text-n-text tracking-tight">
+            Freedom <span className="text-n-green">Dashboard</span>
           </span>
         </div>
       </header>
-      <div className="h-0.5 bg-freedom-green" />
 
-      {/* Card */}
+      {/* Centered card */}
       <div className="flex-1 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-card w-full max-w-md overflow-hidden">
-          {/* Green band */}
-          <div className="h-1.5 bg-freedom-green w-full" />
+        <div className="w-full max-w-sm">
+          {/* Card */}
+          <div className="bg-n-surface border border-n-border rounded-xl overflow-hidden">
+            {/* Green top accent */}
+            <div className="h-px bg-n-green" />
 
-          <div className="p-8">
-            {/* Header */}
-            <div className="text-center mb-8">
-              <div className="inline-flex items-center justify-center w-16 h-16 bg-freedom-green-light rounded-2xl mb-5">
-                <FreedomLogo size={36} />
+            <div className="p-7">
+              {/* Title block */}
+              <div className="mb-6">
+                <h1 className="text-lg font-semibold text-n-text">
+                  {mode === 'setup' ? 'Set up authenticator' : 'Sign in'}
+                </h1>
+                <p className="text-xs text-n-sub mt-1">
+                  {mode === 'setup'
+                    ? 'Scan the QR code with Microsoft Authenticator.'
+                    : 'Enter your 6-digit code from Microsoft Authenticator.'}
+                </p>
               </div>
-              <h1 className="text-2xl font-bold text-freedom-black leading-tight">
-                {mode === 'setup' ? 'Set up Authenticator' : 'Welcome back'}
-              </h1>
-              <p className="text-freedom-text-light text-sm mt-2">
-                {mode === 'setup'
-                  ? 'Scan a QR code with Microsoft Authenticator, then confirm with a 6-digit code.'
-                  : 'Sign in with your 6-digit Microsoft Authenticator code.'}
-              </p>
-            </div>
 
-            {mode === 'setup' ? (
-              !setupStarted ? (
-                <form onSubmit={handleSetupStart} className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-semibold text-freedom-text mb-2">
-                      Email Address
-                    </label>
-                    <input
+              {/* ── Setup mode ── */}
+              {mode === 'setup' ? (
+                !setupStarted ? (
+                  <form onSubmit={handleSetupStart} className="space-y-4">
+                    <InputField
+                      label="Work Email"
                       type="email"
                       value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      onChange={setEmail}
                       placeholder="you@freedommobile.ca"
                       required
                       autoFocus
-                      className="w-full px-4 py-3 border-2 border-freedom-border rounded-xl focus:outline-none focus:border-freedom-green text-freedom-text placeholder-freedom-text-light transition-colors text-sm"
                     />
-                  </div>
-
-                  {error && (
-                    <ErrorBanner error={error} />
-                  )}
-
-                  <button
-                    type="submit"
-                    disabled={loading || !email.trim()}
-                    className="w-full bg-freedom-green hover:bg-freedom-green-dark text-white font-semibold py-3.5 px-6 rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm shadow-sm hover:shadow-md"
-                  >
-                    {loading ? 'Preparing QR...' : 'Generate Authenticator QR'}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => { setMode('login'); setError(null) }}
-                    className="w-full text-sm font-semibold text-freedom-green hover:text-freedom-green-dark transition-colors"
-                  >
-                    Already set up? Use a 6-digit code instead
-                  </button>
-                </form>
-              ) : (
-                <form onSubmit={handleSetupVerify} className="space-y-4">
-                  <div className="bg-freedom-gray rounded-2xl p-4 text-center">
-                    {qrCodeDataUrl && (
-                      <img
-                        src={qrCodeDataUrl}
-                        alt="Microsoft Authenticator QR code"
-                        className="mx-auto rounded-xl bg-white p-2"
-                      />
-                    )}
-                    <p className="text-xs text-freedom-text-light mt-3">
-                      Scan this once in Microsoft Authenticator.
-                    </p>
-                  </div>
-
-                  {manualEntryKey && (
-                    <div className="bg-freedom-green-light rounded-xl p-3">
-                      <p className="text-xs font-semibold text-freedom-black mb-1">Manual setup key</p>
-                      <p className="text-sm font-mono text-freedom-text break-all">{manualEntryKey}</p>
-                    </div>
-                  )}
-
-                  <div>
-                    <label className="block text-sm font-semibold text-freedom-text mb-2">
-                      6-Digit Code
-                    </label>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      value={code}
-                      onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                      placeholder="123456"
-                      required
-                      autoFocus
-                      className="w-full px-4 py-3 border-2 border-freedom-border rounded-xl focus:outline-none focus:border-freedom-green text-freedom-text placeholder-freedom-text-light transition-colors text-sm tracking-[0.3em] text-center"
-                    />
-                  </div>
-
-                  {error && (
-                    <ErrorBanner error={error} />
-                  )}
-
-                  <button
-                    type="submit"
-                    disabled={loading || code.length !== 6}
-                    className="w-full bg-freedom-green hover:bg-freedom-green-dark text-white font-semibold py-3.5 px-6 rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm shadow-sm hover:shadow-md"
-                  >
-                    {loading ? 'Finishing setup...' : 'Finish Setup'}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSetupStarted(false)
-                      setQrCodeDataUrl(null)
-                      setManualEntryKey(null)
-                      setCode('')
-                      setError(null)
-                    }}
-                    className="w-full text-sm font-semibold text-freedom-green hover:text-freedom-green-dark transition-colors"
-                  >
-                    Start over
-                  </button>
-                </form>
-              )
-            ) : (
-              <form onSubmit={handleLogin} className="space-y-4">
-                {rememberedEmail ? (
-                  <div className="bg-freedom-green-light rounded-xl px-4 py-3 flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-semibold text-freedom-text-light">Signing in as</p>
-                      <p className="text-sm font-semibold text-freedom-black">{rememberedEmail}</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={resetRememberedUser}
-                      className="text-xs font-semibold text-freedom-green hover:text-freedom-green-dark transition-colors"
-                    >
-                      Change
-                    </button>
-                  </div>
+                    {error && <ErrorBanner error={error} />}
+                    <PrimaryButton loading={loading} disabled={!email.trim()}>
+                      {loading ? 'Generating QR…' : 'Generate QR code'}
+                    </PrimaryButton>
+                    <GhostButton onClick={() => { setMode('login'); setError(null) }}>
+                      Already set up? Sign in instead →
+                    </GhostButton>
+                  </form>
                 ) : (
-                  <div>
-                    <label className="block text-sm font-semibold text-freedom-text mb-2">
-                      Email Address
-                    </label>
-                    <input
+                  <form onSubmit={handleSetupVerify} className="space-y-4">
+                    {/* QR code */}
+                    <div className="flex flex-col items-center gap-3 bg-n-bg border border-n-border rounded-xl p-4">
+                      {qrCodeDataUrl && (
+                        <div className="bg-white rounded-lg p-2">
+                          <img src={qrCodeDataUrl} alt="QR code" className="w-44 h-44 block" />
+                        </div>
+                      )}
+                      <p className="text-xs text-n-sub text-center">
+                        Scan once with <span className="text-n-text font-medium">Microsoft Authenticator</span>
+                      </p>
+                    </div>
+
+                    {/* Manual key */}
+                    {manualEntryKey && (
+                      <div className="bg-n-raised border border-n-border rounded-lg px-3.5 py-2.5">
+                        <p className="text-xs text-n-muted mb-1">Manual entry key</p>
+                        <p className="text-xs font-mono text-n-sub break-all tracking-wider">{manualEntryKey}</p>
+                      </div>
+                    )}
+
+                    <InputField
+                      label="Confirm with 6-digit code"
+                      value={code}
+                      onChange={v => setCode(v.replace(/\D/g, '').slice(0, 6))}
+                      placeholder="123 456"
+                      inputMode="numeric"
+                      required
+                      autoFocus
+                      className="tracking-[0.4em] text-center font-mono"
+                    />
+                    {error && <ErrorBanner error={error} />}
+                    <PrimaryButton loading={loading} disabled={code.length !== 6}>
+                      {loading ? 'Finishing setup…' : 'Finish setup'}
+                    </PrimaryButton>
+                    <GhostButton onClick={() => { setSetupStarted(false); setQrCodeDataUrl(null); setManualEntryKey(null); setCode(''); setError(null) }}>
+                      ← Start over
+                    </GhostButton>
+                  </form>
+                )
+              ) : (
+                /* ── Login mode ── */
+                <form onSubmit={handleLogin} className="space-y-4">
+                  {rememberedEmail ? (
+                    <div className="flex items-center justify-between bg-n-raised border border-n-border rounded-lg px-3.5 py-2.5">
+                      <div>
+                        <p className="text-xs text-n-muted">Signing in as</p>
+                        <p className="text-sm font-medium text-n-text">{rememberedEmail}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={resetUser}
+                        className="text-xs text-n-sub hover:text-n-green transition-colors"
+                      >
+                        Change
+                      </button>
+                    </div>
+                  ) : (
+                    <InputField
+                      label="Work Email"
                       type="email"
                       value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      onChange={setEmail}
                       placeholder="you@freedommobile.ca"
                       required
                       autoFocus
-                      className="w-full px-4 py-3 border-2 border-freedom-border rounded-xl focus:outline-none focus:border-freedom-green text-freedom-text placeholder-freedom-text-light transition-colors text-sm"
                     />
-                  </div>
-                )}
+                  )}
 
-                <div>
-                  <label className="block text-sm font-semibold text-freedom-text mb-2">
-                    6-Digit Code
-                  </label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
+                  <InputField
+                    label="6-digit code"
                     value={code}
-                    onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                    placeholder="123456"
+                    onChange={v => setCode(v.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="123 456"
+                    inputMode="numeric"
                     required
                     autoFocus={Boolean(rememberedEmail)}
-                    className="w-full px-4 py-3 border-2 border-freedom-border rounded-xl focus:outline-none focus:border-freedom-green text-freedom-text placeholder-freedom-text-light transition-colors text-sm tracking-[0.3em] text-center"
+                    className="tracking-[0.4em] text-center font-mono"
                   />
-                </div>
 
-                {error && <ErrorBanner error={error} />}
+                  {error && <ErrorBanner error={error} />}
 
-                <button
-                  type="submit"
-                  disabled={loading || !email.trim() || code.length !== 6}
-                  className="w-full bg-freedom-green hover:bg-freedom-green-dark text-white font-semibold py-3.5 px-6 rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm shadow-sm hover:shadow-md"
-                >
-                  {loading ? 'Signing in...' : 'Sign in with Code'}
-                </button>
+                  <PrimaryButton loading={loading} disabled={!email.trim() || code.length !== 6}>
+                    {loading ? 'Signing in…' : 'Sign in'}
+                  </PrimaryButton>
 
-                <p className="text-xs text-center text-freedom-text-light pt-1">
-                  Open Microsoft Authenticator and enter the current 6-digit code.
-                </p>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMode('setup')
-                    setSetupStarted(false)
-                    setQrCodeDataUrl(null)
-                    setManualEntryKey(null)
-                    setCode('')
-                    setError(null)
-                  }}
-                  className="w-full text-sm font-semibold text-freedom-green hover:text-freedom-green-dark transition-colors"
-                >
-                  First time on this device? Set up Authenticator
-                </button>
-              </form>
-            )}
+                  <GhostButton onClick={() => { setMode('setup'); setSetupStarted(false); setQrCodeDataUrl(null); setManualEntryKey(null); setCode(''); setError(null) }}>
+                    First time? Set up Authenticator →
+                  </GhostButton>
+                </form>
+              )}
+            </div>
           </div>
 
-          {/* Footer */}
-          <div className="px-8 pb-6 text-center">
-            <p className="text-xs text-freedom-text-light">
-              Freedom Mobile Internal Dashboard &bull; Secure &amp; Private
-            </p>
-          </div>
+          <p className="text-center text-xs text-n-muted mt-4">
+            Freedom Mobile · Internal use only
+          </p>
         </div>
       </div>
     </div>
-  )
-}
-
-function ErrorBanner({ error }: { error: string }) {
-  return (
-    <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl text-sm flex items-center gap-2">
-      <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-      {error}
-    </div>
-  )
-}
-
-function FreedomLogo({ size = 24 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 40 40" fill="none">
-      <rect width="40" height="40" rx="8" fill="#00C389" />
-      <path
-        d="M10 12h16v4H14v4h10v4H14v8h-4V12z"
-        fill="white"
-      />
-      <rect x="22" y="20" width="8" height="4" rx="1" fill="white" />
-    </svg>
   )
 }
 

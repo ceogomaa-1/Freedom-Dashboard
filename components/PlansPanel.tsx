@@ -175,19 +175,28 @@ export default function PlansPanel() {
         )}
       </div>
 
-      {/* Footer — last updated */}
-      {(fetchedAt || error) && (
-        <div className="px-4 pb-3 pt-1 border-t border-n-divider flex-shrink-0">
-          {error && plans.length > 0 && (
-            <p className="text-xs text-n-amber mb-1">{error}</p>
-          )}
-          {fetchedAt && (
-            <p className="text-xs text-n-muted">
-              Last updated: {formatLastUpdated(fetchedAt)}
-            </p>
-          )}
-        </div>
-      )}
+      {/* Footer */}
+      <div className="px-4 pb-3 pt-2 border-t border-n-divider flex-shrink-0 space-y-0.5">
+        {error && plans.length > 0 && (
+          <p className="text-xs text-n-amber">{error}</p>
+        )}
+        {fetchedAt && (
+          <p className="text-xs text-n-muted">
+            Updated: {formatLastUpdated(fetchedAt)}
+          </p>
+        )}
+        <p className="text-xs text-n-muted">
+          Verify prices at{' '}
+          <a
+            href="https://shop.freedommobile.ca/en-CA/plans"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-n-green hover:underline"
+          >
+            shop.freedommobile.ca
+          </a>
+        </p>
+      </div>
     </div>
   )
 }

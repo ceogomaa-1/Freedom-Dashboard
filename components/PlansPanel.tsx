@@ -14,10 +14,8 @@ interface FetchedPlan {
 
 interface PlansResponse {
   plans: FetchedPlan[]
-  fetched_at: string
-  from_cache: boolean
-  stale?: boolean
-  error?: string
+  fetched_at: string | null
+  status: 'ok' | 'empty' | 'error'
 }
 
 function formatLastUpdated(iso: string): string {
@@ -52,31 +50,23 @@ export default function PlansPanel() {
   const [fetchedAt, setFetchedAt] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
-  const [error, setError] = useState('')
+  const [status, setStatus] = useState<'ok' | 'empty' | 'error' | null>(null)
 
   const loadPlans = useCallback(async (force = false) => {
     if (force) setRefreshing(true)
     else setLoading(true)
-    setError('')
 
     try {
-      const res = await fetch(`/api/fetch-plans${force ? '?force=true' : ''}`, {
-        cache: 'no-store',
-      })
+      const res = await fetch('/api/fetch-plans', { cache: 'no-store' })
       const data = await res.json() as PlansResponse
 
-      if (!res.ok || data.error) {
-        setError(data.error ?? 'Could not load plans — tap ↻ to retry.')
-        setPlans([])
-      } else {
-        setPlans(data.plans ?? [])
-        setFetchedAt(data.fetched_at)
-        if (data.stale) {
-          setError('Showing cached data — live fetch failed. Tap ↻ to retry.')
-        }
-      }
+      setPlans(data.plans ?? [])
+      setFetchedAt(data.fetched_at ?? null)
+      setStatus(data.status ?? 'error')
     } catch {
-      setError('Could not load plans — tap ↻ to retry.')
+      setPlans([])
+      setFetchedAt(null)
+      setStatus('error')
     } finally {
       setLoading(false)
       setRefreshing(false)
@@ -86,6 +76,13 @@ export default function PlansPanel() {
   useEffect(() => { loadPlans() }, [loadPlans])
 
   const isSpinning = loading || refreshing
+
+  function emptyMessage(): string {
+    if (status === 'empty' && !fetchedAt) return 'Plans syncing — check back in a few minutes.'
+    if (status === 'empty' && fetchedAt) return 'Could not parse plans — tap ↻ to retry.'
+    if (status === 'error') return 'Could not load plans — tap ↻ to retry.'
+    return 'No plans found — tap ↻ to retry.'
+  }
 
   return (
     <div className="bg-n-surface border border-n-border rounded-xl flex flex-col" style={{ minHeight: 400 }}>
@@ -97,7 +94,7 @@ export default function PlansPanel() {
           <button
             onClick={() => loadPlans(true)}
             disabled={isSpinning}
-            title="Refresh plans from Freedom website"
+            title="Refresh plans"
             className="ml-auto p-1 text-n-muted hover:text-n-green transition-colors disabled:opacity-40"
             aria-label="Refresh plans"
           >
@@ -127,11 +124,9 @@ export default function PlansPanel() {
             <PlanSkeleton />
             <PlanSkeleton />
           </>
-        ) : error && plans.length === 0 ? (
-          <p className="text-xs text-n-muted text-center py-8 leading-relaxed px-2">{error}</p>
         ) : plans.length === 0 ? (
-          <p className="text-xs text-n-muted text-center py-8">
-            No plans found — tap ↻ to retry.
+          <p className="text-xs text-n-muted text-center py-8 leading-relaxed px-2">
+            {emptyMessage()}
           </p>
         ) : (
           plans.map(plan => (
@@ -176,27 +171,13 @@ export default function PlansPanel() {
       </div>
 
       {/* Footer */}
-      <div className="px-4 pb-3 pt-2 border-t border-n-divider flex-shrink-0 space-y-0.5">
-        {error && plans.length > 0 && (
-          <p className="text-xs text-n-amber">{error}</p>
-        )}
-        {fetchedAt && (
+      {fetchedAt && (
+        <div className="px-4 pb-3 pt-2 border-t border-n-divider flex-shrink-0">
           <p className="text-xs text-n-muted">
             Updated: {formatLastUpdated(fetchedAt)}
           </p>
-        )}
-        <p className="text-xs text-n-muted">
-          Verify prices at{' '}
-          <a
-            href="https://shop.freedommobile.ca/en-CA/plans"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-n-green hover:underline"
-          >
-            shop.freedommobile.ca
-          </a>
-        </p>
-      </div>
+        </div>
+      )}
     </div>
   )
 }

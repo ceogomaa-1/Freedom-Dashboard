@@ -1,0 +1,40 @@
+name: Scrape Freedom Mobile Plans
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'   # Every 6 hours
+  workflow_dispatch:          # Manual trigger from GitHub UI → Actions tab
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install scraper dependencies
+        run: |
+          cd scripts
+          npm install playwright @supabase/supabase-js --no-save
+
+      - name: Install Chromium browser
+        run: npx playwright install chromium --with-deps
+
+      - name: Run scraper
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node scripts/scrape-plans.js
+
+      - name: Report failure
+        if: failure()
+        run: |
+          echo "❌ Scraping failed."
+          echo "Check the logs above. If DOM selectors changed, update scripts/scrape-plans.js."

@@ -6,14 +6,21 @@ export const dynamic = 'force-dynamic'
 
 const CACHE_KEY = 'global'
 
-interface FetchedPlan {
+interface PricingOption {
+  monthlyPrice: number
+  fromPrice: number
+  saveUpTo: number
+  requiredPlan: string
+  termMonths: number
+}
+
+interface Device {
   id: string
+  brand: string
   name: string
-  price: string
-  data: string
-  network: string
-  promoText: string
-  is_promo: boolean
+  is5G: boolean
+  tradeUp: PricingOption | null
+  myTab: PricingOption | null
 }
 
 export async function GET() {
@@ -38,7 +45,7 @@ export async function GET() {
   }
 
   return NextResponse.json({
-    plans: data.plans as FetchedPlan[],
+    plans: data.plans as Device[],
     fetched_at: data.fetched_at as string,
     status: 'ok',
   })

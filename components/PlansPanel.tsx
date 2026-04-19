@@ -2,18 +2,25 @@
 
 import { useState, useEffect, useCallback } from 'react'
 
-interface FetchedPlan {
-  id: string
-  name: string
-  price: string
-  data: string
-  network: string
-  promoText: string
-  is_promo: boolean
+interface PricingOption {
+  monthlyPrice: number
+  fromPrice: number
+  saveUpTo: number
+  requiredPlan: string
+  termMonths: number
 }
 
-interface PlansResponse {
-  plans: FetchedPlan[]
+interface Device {
+  id: string
+  brand: string
+  name: string
+  is5G: boolean
+  tradeUp: PricingOption | null
+  myTab: PricingOption | null
+}
+
+interface DevicesResponse {
+  plans: Device[]
   fetched_at: string | null
   status: 'ok' | 'empty' | 'error'
 }
@@ -31,40 +38,81 @@ function formatLastUpdated(iso: string): string {
   return d.toLocaleDateString('en-CA', { month: 'short', day: 'numeric' }) + ', ' + time
 }
 
-function PlanSkeleton() {
+function PricingRow({
+  label,
+  option,
+  accent,
+}: {
+  label: string
+  option: PricingOption
+  accent: 'green' | 'blue'
+}) {
+  const labelClass =
+    accent === 'green' ? 'text-n-green' : 'text-blue-400'
+
   return (
-    <div className="bg-n-raised border border-n-border rounded-lg px-3 py-2.5 animate-pulse">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex-1 space-y-1.5">
+    <div className="mt-2 pt-2 border-t border-n-divider first:mt-0 first:pt-0 first:border-t-0">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className={`text-xs font-semibold ${labelClass}`}>{label}</span>
+        <span className="text-sm font-bold text-n-text">
+          ${option.monthlyPrice % 1 === 0 ? option.monthlyPrice : option.monthlyPrice.toFixed(2)}/mo.
+        </span>
+      </div>
+      <div className="mt-0.5 space-y-0.5">
+        <p className="text-xs text-n-muted">
+          From ${option.fromPrice} ·{' '}
+          <span className="text-n-green">Save up to ${option.saveUpTo}</span>
+        </p>
+        {(option.requiredPlan || option.termMonths) && (
+          <p className="text-xs text-n-muted">
+            {option.requiredPlan && `With ${option.requiredPlan}`}
+            {option.requiredPlan && option.termMonths ? ' · ' : ''}
+            {option.termMonths ? `${option.termMonths}-month term` : ''}
+          </p>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function DeviceSkeleton() {
+  return (
+    <div className="bg-n-raised border border-n-border rounded-lg px-3 py-3 animate-pulse">
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <div className="space-y-1.5 flex-1">
+          <div className="h-2.5 bg-n-hover rounded w-1/4" />
           <div className="h-3.5 bg-n-hover rounded w-2/3" />
-          <div className="h-2.5 bg-n-hover rounded w-1/3" />
         </div>
-        <div className="h-4 bg-n-hover rounded w-14 flex-shrink-0" />
+        <div className="h-5 bg-n-hover rounded w-10" />
+      </div>
+      <div className="space-y-1 mt-3">
+        <div className="h-3 bg-n-hover rounded w-full" />
+        <div className="h-2.5 bg-n-hover rounded w-3/4" />
       </div>
     </div>
   )
 }
 
 export default function PlansPanel() {
-  const [plans, setPlans] = useState<FetchedPlan[]>([])
+  const [devices, setDevices] = useState<Device[]>([])
   const [fetchedAt, setFetchedAt] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [status, setStatus] = useState<'ok' | 'empty' | 'error' | null>(null)
 
-  const loadPlans = useCallback(async (force = false) => {
+  const loadDevices = useCallback(async (force = false) => {
     if (force) setRefreshing(true)
     else setLoading(true)
 
     try {
       const res = await fetch('/api/fetch-plans', { cache: 'no-store' })
-      const data = await res.json() as PlansResponse
+      const data = await res.json() as DevicesResponse
 
-      setPlans(data.plans ?? [])
+      setDevices(data.plans ?? [])
       setFetchedAt(data.fetched_at ?? null)
       setStatus(data.status ?? 'error')
     } catch {
-      setPlans([])
+      setDevices([])
       setFetchedAt(null)
       setStatus('error')
     } finally {
@@ -73,15 +121,15 @@ export default function PlansPanel() {
     }
   }, [])
 
-  useEffect(() => { loadPlans() }, [loadPlans])
+  useEffect(() => { loadDevices() }, [loadDevices])
 
   const isSpinning = loading || refreshing
 
   function emptyMessage(): string {
-    if (status === 'empty' && !fetchedAt) return 'Plans syncing — check back in a few minutes.'
-    if (status === 'empty' && fetchedAt) return 'Could not parse plans — tap ↻ to retry.'
-    if (status === 'error') return 'Could not load plans — tap ↻ to retry.'
-    return 'No plans found — tap ↻ to retry.'
+    if (status === 'empty' && !fetchedAt) return 'Devices syncing — check back in a few minutes.'
+    if (status === 'empty' && fetchedAt) return 'Could not parse devices — tap ↻ to retry.'
+    if (status === 'error') return 'Could not load devices — tap ↻ to retry.'
+    return 'No devices found — tap ↻ to retry.'
   }
 
   return (
@@ -90,13 +138,13 @@ export default function PlansPanel() {
       <div className="px-4 pt-4 pb-3 border-b border-n-divider">
         <div className="flex items-center gap-2">
           <div className="w-0.5 h-4 bg-n-green rounded-full flex-shrink-0" />
-          <h2 className="text-sm font-semibold text-n-text">Today&apos;s Plans</h2>
+          <h2 className="text-sm font-semibold text-n-text">Today&apos;s Devices</h2>
           <button
-            onClick={() => loadPlans(true)}
+            onClick={() => loadDevices(true)}
             disabled={isSpinning}
-            title="Refresh plans"
+            title="Refresh devices"
             className="ml-auto p-1 text-n-muted hover:text-n-green transition-colors disabled:opacity-40"
-            aria-label="Refresh plans"
+            aria-label="Refresh devices"
           >
             <svg
               className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`}
@@ -119,51 +167,52 @@ export default function PlansPanel() {
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2">
         {loading ? (
           <>
-            <PlanSkeleton />
-            <PlanSkeleton />
-            <PlanSkeleton />
-            <PlanSkeleton />
+            <DeviceSkeleton />
+            <DeviceSkeleton />
+            <DeviceSkeleton />
+            <DeviceSkeleton />
           </>
-        ) : plans.length === 0 ? (
+        ) : devices.length === 0 ? (
           <p className="text-xs text-n-muted text-center py-8 leading-relaxed px-2">
             {emptyMessage()}
           </p>
         ) : (
-          plans.map(plan => (
+          devices.map(device => (
             <div
-              key={plan.id}
-              className="bg-n-raised border border-n-border rounded-lg px-3 py-2.5"
+              key={device.id}
+              className="bg-n-raised border border-n-border rounded-lg px-3 py-3"
             >
-              <div className="flex items-start gap-2">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-sm font-medium text-n-text leading-tight">
-                      {plan.name}
-                    </span>
-                    {plan.is_promo && (
-                      <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-n-green-x text-n-green tracking-wide flex-shrink-0">
-                        PROMO
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex flex-wrap items-center gap-x-2 mt-0.5">
-                    {plan.data && (
-                      <span className="text-xs text-n-sub">{plan.data}</span>
-                    )}
-                    {plan.data && plan.network && (
-                      <span className="text-xs text-n-muted">·</span>
-                    )}
-                    {plan.network && (
-                      <span className="text-xs text-n-muted">{plan.network}</span>
-                    )}
-                  </div>
-                  {plan.promoText && (
-                    <p className="text-xs text-n-green mt-0.5 leading-tight">{plan.promoText}</p>
+              {/* Device header */}
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  {device.brand && (
+                    <p className="text-xs text-n-muted leading-tight">{device.brand}</p>
                   )}
+                  <p className="text-sm font-bold text-n-text leading-tight">{device.name}</p>
                 </div>
-                <span className="text-sm font-semibold text-n-green flex-shrink-0 mt-0.5">
-                  {plan.price}
-                </span>
+                {device.is5G && (
+                  <span
+                    className="text-xs font-bold px-1.5 py-0.5 rounded flex-shrink-0"
+                    style={{
+                      background: 'linear-gradient(135deg, #f97316, #ef4444)',
+                      color: '#fff',
+                      fontSize: '0.65rem',
+                      letterSpacing: '0.05em',
+                    }}
+                  >
+                    5G+
+                  </span>
+                )}
+              </div>
+
+              {/* Pricing options */}
+              <div className="mt-2">
+                {device.tradeUp && (
+                  <PricingRow label="🔄 Trade-Up" option={device.tradeUp} accent="green" />
+                )}
+                {device.myTab && (
+                  <PricingRow label="📱 MyTab" option={device.myTab} accent="blue" />
+                )}
               </div>
             </div>
           ))
@@ -173,9 +222,7 @@ export default function PlansPanel() {
       {/* Footer */}
       {fetchedAt && (
         <div className="px-4 pb-3 pt-2 border-t border-n-divider flex-shrink-0">
-          <p className="text-xs text-n-muted">
-            Updated: {formatLastUpdated(fetchedAt)}
-          </p>
+          <p className="text-xs text-n-muted">Updated: {formatLastUpdated(fetchedAt)}</p>
         </div>
       )}
     </div>

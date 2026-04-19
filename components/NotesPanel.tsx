@@ -74,8 +74,47 @@ export default function NotesPanel() {
     return '🎉 Excellent day!'
   }
 
+  function handlePrint() {
+    window.print()
+  }
+
+  const printDate = new Date().toLocaleDateString('en-CA', {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+  })
+
   return (
     <div className="flex flex-col gap-4">
+      {/* Print styles — only active during window.print() */}
+      <style>{`
+        @media print {
+          body * { visibility: hidden !important; }
+          #print-note-content,
+          #print-note-content * { visibility: visible !important; }
+          #print-note-content {
+            display: block !important;
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            padding: 40px !important;
+            font-family: Georgia, serif !important;
+            color: #000 !important;
+            background: #fff !important;
+          }
+        }
+      `}</style>
+
+      {/* Hidden print target */}
+      <div id="print-note-content" style={{ display: 'none' }}>
+        <div style={{ borderBottom: '1px solid #ccc', paddingBottom: 12, marginBottom: 20 }}>
+          <div style={{ fontSize: 18, fontWeight: 'bold' }}>Freedom Dashboard — Note</div>
+          <div style={{ fontSize: 13, color: '#555', marginTop: 4 }}>{printDate}</div>
+        </div>
+        <pre style={{ fontFamily: 'Georgia, serif', fontSize: 14, lineHeight: 1.7, whiteSpace: 'pre-wrap', margin: 0 }}>
+          {notes}
+        </pre>
+      </div>
+
       {/* ── Notes ── */}
       <div className="bg-n-surface border border-n-border rounded-xl flex flex-col" style={{ minHeight: 340 }}>
         <div className="px-4 pt-4 pb-3 border-b border-n-divider">
@@ -83,6 +122,18 @@ export default function NotesPanel() {
             <div className="w-0.5 h-4 bg-n-green rounded-full flex-shrink-0" />
             <h2 className="text-sm font-semibold text-n-text">Side Notes</h2>
             <div className="ml-auto flex items-center gap-1.5">
+              <button
+                onClick={handlePrint}
+                title="Print note"
+                className="p-1 text-n-muted hover:text-n-green transition-colors"
+                aria-label="Print note"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
+                  />
+                </svg>
+              </button>
               {saving && (
                 <span className="text-xs text-n-muted flex items-center gap-1">
                   <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor">

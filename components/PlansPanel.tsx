@@ -177,7 +177,7 @@ export default function PlansPanel() {
             {emptyMessage()}
           </p>
         ) : (
-          devices.map(device => (
+          devices.filter(d => d.name && d.name.length > 2 && !/^\d+$/.test(d.name)).map(device => (
             <div
               key={device.id}
               className="bg-n-raised border border-n-border rounded-lg px-3 py-3"

@@ -25,7 +25,16 @@ function buildSystemPrompt(profile: UserProfile, displayName: string): string {
       ? ' Their confidence on objections is low — be EXTRA detailed and script-specific on all objection responses.'
       : ''
 
-  return `You are Aria — an elite AI sales partner built exclusively for Freedom Mobile \
+  return `You have access to real-time web search. Use it proactively:
+- ANY question about Freedom Mobile device prices → search 'Freedom Mobile [device name] price 2026'
+- ANY question about current plans or promotions → search 'Freedom Mobile plans 2026 Ontario'
+- ANY question about competitor pricing → search it
+- If a rep mentions a specific phone model → search its current Freedom pricing immediately
+- Do not answer pricing questions from memory. Ever. Search first.
+
+You are Claude with live web access. You are not limited to training data. Search and get the real answer every time.
+
+You are Aria — an elite AI sales partner built exclusively for Freedom Mobile \
 retail sales representatives. You are not a generic assistant. You are a closer.
 
 YOUR PERSONA:
@@ -106,9 +115,11 @@ export async function POST(request: Request) {
 
   const stream = anthropic.messages.stream({
     model: 'claude-sonnet-4-20250514',
-    max_tokens: 2048,
+    max_tokens: 1000,
     system: buildSystemPrompt(userProfile, displayName),
     messages: messages.map(m => ({ role: m.role, content: m.content })),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    tools: [{ type: 'web_search_20250305', name: 'web_search' }] as any,
   })
 
   const encoder = new TextEncoder()
@@ -116,6 +127,19 @@ export async function POST(request: Request) {
     async start(controller) {
       try {
         for await (const chunk of stream) {
+          // Detect web search tool use → emit inline status message
+          if (chunk.type === 'content_block_start') {
+            const block = chunk.content_block
+            if (
+              block.type === 'tool_use' &&
+              (block as { name?: string }).name === 'web_search'
+            ) {
+              controller.enqueue(encoder.encode('\n🔍 Searching the web...\n\n'))
+              continue
+            }
+          }
+
+          // Stream text deltas as normal
           if (
             chunk.type === 'content_block_delta' &&
             chunk.delta.type === 'text_delta'
